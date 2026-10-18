@@ -2224,54 +2224,79 @@
         }
       });
 
-      /* AUDIO */
-      let audioCtx = null, isPlaying = false, timer = null;
+      /* PEACEFUL WEDDING BGM (Canon in D Solo Piano) */
       const audioBtn = document.getElementById('audio-btn');
       const audioLbl = document.getElementById('audio-lbl');
-      const chords = [
-        [261.63, 329.63, 392.00, 523.25],
-        [220.00, 261.63, 329.63, 440.00],
-        [174.61, 220.00, 261.63, 349.23],
-        [196.00, 246.94, 293.66, 392.00]
-      ];
 
-      function note(f, t) {
-        if (!audioCtx) return;
-        const osc = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(f, t);
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.055, t + 0.07);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.9);
-        osc.connect(g); g.connect(audioCtx.destination);
-        osc.start(t); osc.stop(t + 2.0);
+      const bgm = new Audio();
+      bgm.loop = true;
+      bgm.preload = 'auto';
+
+      // Support Ogg with MP3 fallback
+      const canOgg = bgm.canPlayType && bgm.canPlayType('audio/ogg; codecs="vorbis"');
+      bgm.src = canOgg ? 'assets/wedding-bgm.ogg' : 'assets/wedding-bgm.mp3';
+
+      let isPlaying = false;
+      let fadeInterval = null;
+
+      function fadeAudio(targetVolume, durationMs, onComplete) {
+        clearInterval(fadeInterval);
+        const startVolume = bgm.volume;
+        const diff = targetVolume - startVolume;
+        const steps = 25;
+        const stepTime = durationMs / steps;
+        let step = 0;
+        fadeInterval = setInterval(() => {
+          step++;
+          bgm.volume = Math.max(0, Math.min(1, startVolume + diff * (step / steps)));
+          if (step >= steps) {
+            clearInterval(fadeInterval);
+            if (onComplete) onComplete();
+          }
+        }, stepTime);
+      }
+
+      function playMusic() {
+        if (isPlaying) return;
+        isPlaying = true;
+        bgm.volume = 0;
+        bgm.play().then(() => {
+          audioBtn.classList.add('active');
+          audioLbl.textContent = 'Pause';
+          fadeAudio(0.48, 1200);
+        }).catch(() => {
+          isPlaying = false;
+          audioBtn.classList.remove('active');
+          audioLbl.textContent = 'Music';
+        });
+      }
+
+      function pauseMusic() {
+        if (!isPlaying) return;
+        isPlaying = false;
+        audioBtn.classList.remove('active');
+        audioLbl.textContent = 'Music';
+        fadeAudio(0, 600, () => {
+          bgm.pause();
+        });
       }
 
       function toggleAudio() {
         if (!isPlaying) {
-          if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          if (audioCtx.state === 'suspended') audioCtx.resume();
-          isPlaying = true;
-          audioBtn.classList.add('active');
-          audioLbl.textContent = 'Pause';
-          let step = 0;
-          function cycle() {
-            if (!isPlaying) return;
-            const c = chords[step % chords.length];
-            const t = audioCtx.currentTime;
-            c.forEach((n, i) => note(n, t + i * 0.38));
-            step++;
-          }
-          cycle();
-          timer = setInterval(cycle, 2200);
+          playMusic();
         } else {
-          clearInterval(timer); isPlaying = false;
-          audioBtn.classList.remove('active');
-          audioLbl.textContent = 'Music';
+          pauseMusic();
         }
       }
+
       audioBtn.addEventListener('click', toggleAudio);
+
+      // Auto-start peaceful music if guest taps/clicks the door
+      loader.addEventListener('click', () => {
+        if (!isPlaying) {
+          playMusic();
+        }
+      });
 
       /* SCROLL REVEAL */
       const revealElements = document.querySelectorAll('[data-reveal]');
